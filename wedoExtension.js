@@ -33,6 +33,16 @@
         }, 1000 * time);
     };
 
+    ext.setServoMotorDirectionFor = function( motor, s, time, callback) {
+        ext.setServoMotorDirection(motor,s);
+
+        setTimeout(function () {
+            ext.resetServoMotor(motor)
+            //callback();
+            if (typeof callback == "function") callback();
+        }, 1000 * time);
+    };
+
     ext.motorOn = function (motor) {
         switch (motor) {
             case "motor":
@@ -440,6 +450,7 @@
     var descriptor = {
         blocks: [
             ['w', 'turn %m.motor on for %n secs',                 'motorOnFor',        'motor', 1],
+            ['w', 'turn %m.servoMotor to %m.servoMotorDirection2 for %n secs',   'setServoMotorDirectionFor', 'servo motor', 'left', 1],
             [' ', 'turn %m.motor on',                             'motorOn',           'motor'],
             [' ', 'turn %m.motor off',                            'motorOff',          'motor'],
             [' ', 'set %m.motor power to %n',                     'startMotorPower',   'motor', 100],
@@ -456,6 +467,7 @@
             motor2: ['motor', 'motor A', 'motor B', 'all motors'],
             servoMotor: ['servo motor','servo motor A','servo motor B', 'all servo motors'],
             servoMotorDirection: ['left','right','reverse','original'],
+            servoMotorDirection2: ['left','right'],
             motorDirection: ['closewise', 'counter-clockwise', 'reverse'],
             lessMore: ['<', '>'],
             eNe: ['=', 'not =']

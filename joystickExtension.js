@@ -31,12 +31,14 @@
 
 
     ext._stop = function () {
+        //console.log("stopped")
         clearButtons();
     };
 
     var poller = null;
     ext._deviceConnected = function (dev) {
         if (device) return;
+        //console.log("connected")
         device = dev;
         device.open();
         poller = setInterval(function () {
@@ -69,6 +71,9 @@
     function processData() {
         var s = new Uint8Array(rawData);
 
+        //console.log("processData()");
+        //console.log(s);
+
         clearButtons();
 
         buttons.up=(s[9]==0)?0:1;
@@ -87,15 +92,14 @@
         buttons.R2=(s[18]==0)?0:1;
 
         buttons.back=((s[1] & 0x1)==0)?0:1;
-        buttons.start=((s[1] & 0x10)==0)?0:1;
+        buttons.start=((s[1] & 0x2)==0)?0:1;
 
-        buttons.L_Stick_X=128-s[3];
-        buttons.L_Stick_Y=128-s[4];
-        buttons.R_Stick_X=128-s[5];
-        buttons.R_Stick_Y=128-s[6];
+        buttons.L_Stick_X=s[3]-128;
+        buttons.L_Stick_Y=s[4]-128;
+        buttons.R_Stick_X=s[5]-128;
+        buttons.R_Stick_Y=s[6]-128;
 
-
-        clearButtons();
+        //console.log(buttons);
 
         rawData = null;
     }
@@ -107,7 +111,10 @@
     }
 
     function getButtonPressed(btn) {
+        //console.log("getButtonPressed("+btn+")");
+        //console.log(rawData);
         if (rawData) processData();
+        //console.log(buttons[btn]);
         switch (btn) {
             case 'left stick up':
                 return buttons.L_Stick_Y<0;

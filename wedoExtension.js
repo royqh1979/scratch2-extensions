@@ -44,6 +44,12 @@
             case "motor B":
                 setMotorOn('m', 1, true);
                 break;
+            case "light A":
+                setMotorOn('l', 0, true);
+                break;
+            case "light B":
+                setMotorOn('l', 1, true);
+                break;
             case "lights":
                 ext.allMotorsOn('l');
                 break;
@@ -68,6 +74,12 @@
             case "motor B":
                 setMotorOn('m', 1, false);
                 break;
+            case "light A":
+                setMotorOn('l', 0, false);
+                break;
+            case "light B":
+                setMotorOn('l', 1, false);
+                break;
             case "lights":
                 ext.allMotorsOff('l');
                 break;
@@ -78,6 +90,8 @@
 
     ext._stop = function () {
         ext.allMotorsOff('a');
+        setServoMotorDirection(0, 0);
+        setServoMotorDirection(1, 0);
     };
     ext.allMotorsOff = function (type) {
         setMotorOn(type, 0, false);
@@ -100,6 +114,14 @@
                 setMotorPower('m', 1, power);
                 setMotorOn('m', 1, true);
                 break;
+            case "light A":
+                setMotorPower('l', 0, power);
+                setMotorOn('l', 0, true);
+                break;
+            case "light B":
+                setMotorPower('l', 1, power);
+                setMotorOn('l', 1, true);
+                break;
             case "lights":
                 setMotorPower('l', 0, power);
                 setMotorPower('l', 1, power);
@@ -114,11 +136,52 @@
         }
     };
 
+    ext.setServoMotorDirection = function( motor, s) {
+        var dir;
+        if ('left' == s) {
+            dir = 1;
+        } else if ('right' == s) {
+            dir = -1;
+        } else if ('original' == s) {
+            dir = 0;
+        } else if ('reverse' == s) {
+            dir = 2;
+        }else {
+            return;
+        }
+
+        switch (motor) {
+            case "servo motor A":
+                setServoMotorDirection(0, dir);
+                break;
+            case "servo motor B":
+                setServoMotorDirection(1, dir);
+                break;
+            default:
+                setServoMotorDirection(0, dir);
+                setServoMotorDirection(1, dir);
+        }
+    }
+
+    ext.resetServoMotor = function( motor) {
+        switch (motor) {
+            case "servo motor A":
+                setServoMotorDirection(0, 0);
+                break;
+            case "servo motor B":
+                setServoMotorDirection(1, 0);
+                break;
+            default:
+                setServoMotorDirection(0, 0);
+                setServoMotorDirection(1, 0);
+        }
+    }
+
     ext.setMotorDirection = function (motor, s) {
         var dir;
-        if ('this way' == s) {
+        if ('clockwise' == s) {
             dir = 1;
-        } else if ('that way' == s) {
+        } else if ('counter-clockwise' == s) {
             dir = -1;
         } else if ('reverse' == s) {
             dir = 0;
@@ -165,6 +228,30 @@
         if ((dir == -1) || (dir == 1)) motor.dir = dir;
         if (dir == 0) motor.dir = -motor.dir; // reverse
         if (motor.isOn) sendMotorState();
+    }
+
+    function setServoMotorDirection(motorID, dir) {
+        // Dir: -1 - right, 1 - left, 0 - original , 2 - reverse
+        var motor = getServoMotor( motorID);
+        if (!motor) return; // motorID must be 0 or 1
+
+        var wasOn = motor.isOn && (motor.power > 0);
+        if ((dir == -1) || (dir == 1)) {
+            motor.dir = dir;
+            motor.isOn = true;
+            motor.power = 100;
+        }
+        if (dir == 2 && motor.isOn) {
+            motor.dir = -motor.dir;
+            motor.power = 100;
+        }
+        if (dir == 0) {
+            motor.dir = 0;
+            motor.isOn = false;
+            motor.power = 0;
+        }
+        if (wasOn) checkForMotorsOff();
+        sendMotorState();
     }
 
     function setMotorOn(type, motorID, flag) {
@@ -222,6 +309,22 @@
         if ((motorID == 0) && isMotor(type, id0)) return motors[0];
         if ((motorID == 1) && isMotor(type, id1)) return motors[1];
         return null;
+    }
+
+    function getServoMotor(motorID) {
+        if (rawData && okayToReadIDs()) {
+            var s = new Uint8Array(rawData);
+            id0 = s[3];
+            id1 = s[5];
+        }
+        if ((motorID == 0) && isServoMotor(id0)) return motors[0];
+        if ((motorID == 1) && isServoMotor(id1)) return motors[1];
+        return null;
+    }
+
+    // Servo Motor
+    function isServoMotor(id) {
+        return ((100 <= id) && (id <= 105));
     }
 
     function isMotor(type, id) {
@@ -319,8 +422,10 @@
     };
 
     ext._shutdown = function () {
-        setMotorOn('a', 0, false);
-        setMotorOn('a', 1, false);
+         setMotorOn('a', 0, false);
+         setMotorOn('a', 1, false);
+         setServoMotorDirection(0, 0)
+         setServoMotorDirection(1, 0)
 
         if (poller) poller = clearInterval(poller);
         if (device) device.close();
@@ -338,16 +443,20 @@
             [' ', 'turn %m.motor on',                             'motorOn',           'motor'],
             [' ', 'turn %m.motor off',                            'motorOff',          'motor'],
             [' ', 'set %m.motor power to %n',                     'startMotorPower',   'motor', 100],
-            [' ', 'set %m.motor2 direction to %m.motorDirection', 'setMotorDirection', 'motor', 'this way'],
+            [' ', 'set %m.motor2 direction to %m.motorDirection', 'setMotorDirection', 'motor', 'clockwise'],
+            [' ', 'turn %m.servoMotor to %m.servoMotorDirection', 'setServoMotorDirection', 'servo motor', 'left'],
+            [' ', 'reset %m.servoMotor', 'resetServoMotor', 'servo motor'],
             ['h', 'when distance %m.lessMore %n',                 'whenDistance',      '<', 20],
             ['h', 'when tilt %m.eNe %n',                          'whenTilt',          '=', 1],
             ['r', 'distance',                                     'getDistance'],
             ['r', 'tilt',                                         'getTilt']
         ],
         menus: {
-            motor: ['motor', 'motor A', 'motor B', 'lights', 'everything'],
+            motor: ['motor', 'motor A', 'motor B', 'light A', 'light B','lights', 'everything'],
             motor2: ['motor', 'motor A', 'motor B', 'all motors'],
-            motorDirection: ['this way', 'that way', 'reverse'],
+            servoMotor: ['servo motor','servo motor A','servo motor B', 'all servo motors'],
+            servoMotorDirection: ['left','right','reverse','original'],
+            motorDirection: ['closewise', 'counter-clockwise', 'reverse'],
             lessMore: ['<', '>'],
             eNe: ['=', 'not =']
         },
